@@ -1,14 +1,33 @@
 import { Writer, WriteCloser } from 'deno'
-import { HttpHeader } from './http-header';
+import { HttpResponseHeaders } from './http-header';
 const CRLF = '\r\n'
-const encoder = new TextEncoder('utf8')
+const encoder = new TextEncoder('utf-8')
 
 export interface HttpResponse {
-  header(header: HttpHeader): HttpResponse
-  headers(headers: HttpHeader[]): HttpResponse
-  status(status: number): HttpResponse
+  /**
+   * Adds the specified headers to the response. It will
+   * be merged into any already added headers.
+   */
+  headers(headers: HttpResponseHeaders): HttpResponse
+
+  /**
+   * Sets the specified HTTP response status
+   */
+  status(status: number, reason?: string): HttpResponse
+
+  /**
+   * Sets the specified reason phrase
+   */
   reason(reason: string): HttpResponse
+
+  /**
+   * Sets the specified response body
+   */
   body(body: Uint8Array): HttpResponse
+
+  /**
+   * Sends the response, resolves when response has been written.
+   */
   reply(): Promise<void>
 }
 
@@ -16,7 +35,7 @@ interface HttpResponseMessage {
   status: number
   protocol: string
   reason: string
-  headers: HttpHeader[]
+  headers: HttpResponseHeaders
   body: Uint8Array
 }
 
@@ -24,8 +43,8 @@ interface HttpResponseMessage {
 async function write(writer: Writer, message: HttpResponseMessage): Promise<void> {
   const lines = [
     `${message.protocol} ${message.status} ${message.reason}`,
-    ...message.headers.map(header => {
-      return `${header.name}: ${header.value}`
+    ...Object.keys(message.headers).map(name => {
+      return `${name}: ${message.headers[name]}`
     }),
     `${CRLF}`
   ].join(CRLF)
@@ -43,23 +62,21 @@ export function response(writer: Writer & WriteCloser): HttpResponse {
     status: undefined,
     reason: undefined,
     body: undefined,
-    headers: [],
+    headers: {},
     protocol: 'HTTP/1.1'
   }
 
   return {
-    header(header: HttpHeader): HttpResponse {
-      message.headers.push(header)
+    headers(headers: HttpResponseHeaders): HttpResponse {
+      message.headers = { ...message.headers, ...headers }
       return this
     },
 
-    headers(headers: HttpHeader[]): HttpResponse {
-      headers.forEach(h => message.headers.push(h))
-      return this
-    },
-
-    status(status: number): HttpResponse {
+    status(status: number, reason?: string): HttpResponse {
       message.status = status
+      if(reason) {
+        message.reason = reason
+      }
       return this
     },
 
