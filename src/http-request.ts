@@ -1,8 +1,8 @@
 import { Reader } from 'deno'
+import { HttpHeader } from './http-header';
 
 const CRLF = '\r\n'
 const decoder = new TextDecoder('utf8')
-const encoder = new TextEncoder('utf8')
 const CR = 13
 const LF = 10
 
@@ -18,10 +18,6 @@ export interface HttpRequest {
   body(): Promise<Uint8Array>
 }
 
-export interface HttpHeader {
-  name: string
-  value: string
-}
 
 async function readChunk(reader: Reader, size: number) {
   const chunk = new Uint8Array(size)
