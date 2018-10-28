@@ -41,7 +41,7 @@ export function createReader(reader: Reader, headers: HttpRequestHeaders) {
   }
 
   async function json() : Promise<any> {
-    return JSON.parse(await text())
+    return hasBody ? JSON.parse(await text()) : undefined
   }
 
   return {
