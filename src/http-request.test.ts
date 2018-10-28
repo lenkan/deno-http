@@ -1,21 +1,46 @@
 import { assertEqual, assertDefined } from '../tools/assertions'
 import { read } from './http-request'
-import { mockReader } from '../tools/mocks';
+import { mockConn } from '../tools/mocks';
 
 const CRLF = '\r\n'
 const encoder = new TextEncoder()
 
+const encodeLines = lines => encoder.encode(lines.join(CRLF))
+
+const encodeJson = body => {
+  const content = encoder.encode(JSON.stringify(body))
+  const envelope = encodeLines([
+    'GET /foo/bar HTTP/1.1',
+    'Content-Type: application/json',
+    `Content-Length: ${content.byteLength}`,
+    CRLF
+  ])
+
+  return Uint8Array.from([...envelope.map(v => v), ...content.map(v => v)])
+}
+
+const encodeText = body => {
+  const content = encoder.encode(body)
+  const envelope = encodeLines([
+    'GET /foo/bar HTTP/1.1',
+    'Content-Type: text/plain',
+    `Content-Length: ${content.byteLength}`,
+    CRLF
+  ])
+
+  return Uint8Array.from([...envelope.map(v => v), ...content.map(v => v)])
+}
 
 export async function testParseRequestLine() {
-  const data = encoder.encode([
+  const data = encodeLines([
     'GET /foo/bar HTTP/1.1',
     CRLF,
     CRLF
-  ].join(CRLF))
+  ])
 
-  const r = mockReader(data)
+  const conn = mockConn({ data })
 
-  const request = await read(r)
+  const request = await read(conn)
 
   assertEqual(request.method, 'GET')
   assertEqual(request.path, '/foo/bar')
@@ -23,17 +48,17 @@ export async function testParseRequestLine() {
 }
 
 export async function testParseRequestLineWithPreceedingLineFeeds() {
-  const data = encoder.encode([
+  const data = encodeLines([
     CRLF,
     CRLF,
     'GET /foo/bar HTTP/1.1',
     CRLF,
     CRLF
-  ].join(CRLF))
+  ])
 
-  const r = mockReader(data)
+  const connection = mockConn({ data })
 
-  const request = await read(r)
+  const request = await read(connection)
 
   assertEqual(request.method, 'GET')
   assertEqual(request.path, '/foo/bar')
@@ -41,14 +66,14 @@ export async function testParseRequestLineWithPreceedingLineFeeds() {
 }
 
 export async function testParseHeaders() {
-  const data = encoder.encode([
+  const data = encodeLines([
     'GET /foo/bar HTTP/1.1',
     'Content-Type: application/json',
     CRLF,
-  ].join(CRLF))
-  const r = mockReader(data)
+  ])
+  const conn = mockConn({ data })
 
-  const request = await read(r)
+  const request = await read(conn)
 
   assertEqual(request.headers, {
     ['Content-Type']: 'application/json'
@@ -56,22 +81,33 @@ export async function testParseHeaders() {
 }
 
 export async function testParseSimpleJSONBody() {
-  const content = encoder.encode(JSON.stringify({ foo: 'bar' }))
-  const data = encoder.encode([
-    'GET /foo/bar HTTP/1.1',
-    'Content-Type: application/json',
-    `Content-Length: ${content.byteLength}`,
-    CRLF,
-  ].join(CRLF))
+  const data = encodeJson({ foo: 'bar' })
 
-  const r = mockReader(Uint8Array.from([
-    ...data.map(v => v),
-    ...content.map(v => v)
-  ]))
-
-  const request = await read(r)
+  const request = await read(mockConn({ data }))
   const actual = await request.json()
 
   assertDefined(actual)
   assertEqual(actual, { foo: 'bar' })
+}
+
+export async function testReadJSONWhenThereIsNoContentLength() {
+  const data = encodeLines([
+    'GET /foo/bar HTTP/1.1',
+    'Content-Type: application/json',
+    CRLF,
+    JSON.stringify({ foo: 'bar' })
+  ])
+
+  const request = await read(mockConn({ data }))
+  const result = await request.json()
+  assertEqual(result, undefined)
+}
+
+export async function testReadTextWhenContentLengthIsSpecified() {
+  const data = encodeText('hallo')
+
+  const request = await read(mockConn({ data }))
+
+  const result = await request.text()
+  assertEqual(result, 'hallo')
 }

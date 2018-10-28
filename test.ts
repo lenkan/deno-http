@@ -1,4 +1,4 @@
-import { readDirSync, args, exit } from 'deno'
+import { readDirSync, args } from 'deno'
 
 function traverse(dir: string) {
   return readDirSync(dir).reduce<string[]>((files, info) => {
@@ -16,7 +16,7 @@ async function run() {
   for (const file of files) {
     const suite = await import(file)
     console.log(file)
-    for (const test of Object.keys(suite)) {
+    for (const test of Object.keys(suite).filter((key, _, all) => !all.some(a => a.startsWith('otest')) || key.startsWith('otest'))) {
       try {
         await suite[test]()
         console.log('PASS:', test)

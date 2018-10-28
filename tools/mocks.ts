@@ -1,37 +1,51 @@
-import { Reader as DenoReader, ReadResult as DenoReadResult } from 'deno'
-import { Reader } from '../src/buffered-reader';
+import { ReadResult, Conn } from 'deno'
 
-export const mockDenoReader = (data: Uint8Array) => {
+export const mockConn = (args: { data?: Uint8Array }) => {
+  const { data = Uint8Array.from([]) } = args
+
   let current = data
-  const r: DenoReader = {
-    read(p: ArrayBufferView): Promise<DenoReadResult> {
+  let written: ArrayBufferView[] = []
+  let open = true
+
+  const conn: Conn = {
+    localAddr: '',
+    remoteAddr: '',
+    read(p: ArrayBufferView): Promise<ReadResult> {
       const array = p as Uint8Array
       const nread = Math.min(data.byteLength, p.byteLength)
       array.set(current.slice(0, nread))
       current = current.slice(nread)
-      
-      return Promise.resolve<DenoReadResult>({
+
+      return Promise.resolve<ReadResult>({
         nread,
         eof: false
       })
-    }
-  }
-
-  return r
-}
-
-export const mockReader = (data: Uint8Array) => {
-  let pos = 0
-  const r: Reader = {
-    read(length: number): Promise<Uint8Array> {
-      const result = data.subarray(pos, length + pos)
-      pos += length
-      return Promise.resolve(result)
     },
 
-    readUint8(): Promise<number> {
-      return Promise.resolve(data[pos++])
+    write(p: ArrayBufferView): Promise<number> {
+      written.push(p)
+      return Promise.resolve(p.byteLength)
+    },
+
+    close() {
+      open = false
+    },
+
+    closeRead() {
+      throw new Error('NI')
+    },
+
+    closeWrite() {
+      throw new Error('NI')
     }
   }
-  return r
+
+  return Object.assign(conn, {
+    written() {
+      return written
+    },
+    isOpen() {
+      return open
+    }
+  })
 }

@@ -1,6 +1,7 @@
 import { Reader as DenoReader } from 'deno'
 
 export interface Reader {
+  reader: DenoReader
   read(length: number): Promise<Uint8Array>
   readUint8(): Promise<number>
 }
@@ -29,7 +30,7 @@ export class BufferedReader implements Reader {
   private chunk: Uint8Array
   private pos: number = 0
 
-  constructor(private reader: DenoReader, private size : number) {}
+  constructor(public reader: DenoReader, private size : number) {}
 
   async readUint8(): Promise<number> {
     if (!this.chunk) {

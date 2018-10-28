@@ -53,22 +53,6 @@ type ResponseHeaderName =
   'Vary' |
   'WWW-Authenticate'
 
-function parseHeader(header: string) {
-  const separator = header.indexOf(':')
-  const name = header.slice(0, separator).trim()
-  const value = header.slice(separator + 1, header.length).trim()
-  return { name, value }
-}
-
-export function parse(lines: string[]): HttpRequestHeaders {
-  return lines.reduce((all, line) => {
-    const { name, value } = parseHeader(line)
-    return {
-      ...all,
-      [name]: value
-    }
-  }, {})
-}
 
 export type HttpRequestHeaders =
   { [key in GeneralHeaderName]?: string } &

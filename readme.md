@@ -5,7 +5,7 @@ This repository implements a simple http server on top of [deno](https://github.
 ## Usage
 
 ```typescript
-import { listen } from 'https://raw.githubusercontent.com/lenkan/deno-http/v0.0.3/src/http'
+import { listen } from 'https://raw.githubusercontent.com/lenkan/deno-http/v0.0.4/src/http'
 
 listen('127.0.0.1:3000', async (req, res) => {
   const encoder = new TextEncoder('utf8')
@@ -19,9 +19,7 @@ listen('127.0.0.1:3000', async (req, res) => {
     .headers({
       'Content-Type': 'application/json',
       'Content-Length': response.byteLength.toString()
-    })
-    .body(body)
-    .reply()
+    }).send(body)
 })
 ```
 

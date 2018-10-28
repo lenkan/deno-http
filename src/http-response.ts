@@ -1,9 +1,14 @@
-import { Writer, WriteCloser } from 'deno'
-import { HttpResponseHeaders } from './http-header';
+import { Writer, Conn } from 'deno'
+import { HttpResponseHeaders, HttpRequestHeaders } from './http-header';
 const CRLF = '\r\n'
 const encoder = new TextEncoder('utf-8')
 
 export interface HttpResponse {
+  /**
+   * Gets the underlying connection instance.
+   */
+  connection: Conn
+
   /**
    * Adds the specified headers to the response. It will
    * be merged into any already added headers.
@@ -16,19 +21,9 @@ export interface HttpResponse {
   status(status: number, reason?: string): HttpResponse
 
   /**
-   * Sets the specified reason phrase
+   * Sends the response with the specified body. Resolves when the body has been written.
    */
-  reason(reason: string): HttpResponse
-
-  /**
-   * Sets the specified response body
-   */
-  body(body: Uint8Array): HttpResponse
-
-  /**
-   * Sends the response, resolves when response has been written.
-   */
-  reply(): Promise<void>
+  send(body?: Uint8Array): Promise<void>
 }
 
 interface HttpResponseMessage {
@@ -36,11 +31,10 @@ interface HttpResponseMessage {
   protocol: string
   reason: string
   headers: HttpResponseHeaders
-  body: Uint8Array
 }
 
 
-async function write(writer: Writer, message: HttpResponseMessage): Promise<void> {
+async function write(writer: Writer, message: HttpResponseMessage, body?: Uint8Array): Promise<void> {
   const lines = [
     `${message.protocol} ${message.status} ${message.reason}`,
     ...Object.keys(message.headers).map(name => {
@@ -51,22 +45,42 @@ async function write(writer: Writer, message: HttpResponseMessage): Promise<void
 
   const envelope = encoder.encode(lines)
 
-  const data = new Uint8Array(envelope.length + message.body.length)
+  const data = new Uint8Array(envelope.length + (body ? body.length : 0))
+
   data.set(envelope, 0)
-  data.set(message.body, envelope.length)
+  if (body) {
+    data.set(body, envelope.length)
+  }
+
   await writer.write(data)
 }
 
-export function response(writer: Writer & WriteCloser): HttpResponse {
+function head(obj: HttpResponseHeaders) {
+  return obj
+}
+
+const defaultHeaders : HttpResponseHeaders = Object.freeze(head({
+  'Connection': 'close'
+}))
+  
+
+export function response(connection: Conn, request: HttpRequestHeaders): HttpResponse {
   const message: HttpResponseMessage = {
     status: undefined,
     reason: undefined,
-    body: undefined,
-    headers: {},
+    headers: defaultHeaders,
     protocol: 'HTTP/1.1'
   }
 
+  function finish() {
+    const shouldClose = request.Connection === 'close' || message.headers.Connection === 'close'
+    if(shouldClose) {
+      connection.close()
+    }
+  }
+
   return {
+    connection,
     headers(headers: HttpResponseHeaders): HttpResponse {
       message.headers = { ...message.headers, ...headers }
       return this
@@ -74,25 +88,15 @@ export function response(writer: Writer & WriteCloser): HttpResponse {
 
     status(status: number, reason?: string): HttpResponse {
       message.status = status
-      if(reason) {
+      if (reason) {
         message.reason = reason
       }
       return this
     },
 
-    body(body: Uint8Array): HttpResponse {
-      message.body = body
-      return this
-    },
-
-    reason(reason: string): HttpResponse {
-      message.reason = reason
-      return this
-    },
-
-    async reply() {
-      await write(writer, message)
-      writer.close()
+    async send(body?: Uint8Array) {
+      await write(connection, message, body)
+      finish()
     }
   }
 }

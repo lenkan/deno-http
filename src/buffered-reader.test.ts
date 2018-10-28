@@ -1,13 +1,13 @@
-import { mockDenoReader as mockReader } from '../tools/mocks'
+import { mockConn as mockReader } from '../tools/mocks'
 import { assertEqual } from '../tools/assertions'
 import { BufferedReader } from './buffered-reader'
 
 const create = BufferedReader.from
+const encoder = new TextEncoder()
 
 export async function testReadBytes() {
-  const encoder = new TextEncoder()
   const data = encoder.encode('foo')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 1024)
 
   const result = [
@@ -22,9 +22,8 @@ export async function testReadBytes() {
 }
 
 export async function testReadBytesWhenInputIsChunked() {
-  const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 2)
 
   const result = [
@@ -45,9 +44,8 @@ export async function testReadBytesWhenInputIsChunked() {
 }
 
 export async function testReadLength() {
-  const encoder = new TextEncoder()
   const data = encoder.encode('foo')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 1024)
 
   const result = await reader.read(3)
@@ -55,9 +53,8 @@ export async function testReadLength() {
 }
 
 export async function testReadLengthWhenDataIsChunked() {
-  const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 3)
 
   const result = await reader.read(6)
@@ -65,9 +62,8 @@ export async function testReadLengthWhenDataIsChunked() {
 }
 
 export async function testReadLengthMultipleTimes() {
-  const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 1024)
 
   const result = [
@@ -82,7 +78,7 @@ export async function testReadLengthMultipleTimes() {
 export async function testReadLengthMultipleTimesWhenDataIsChunked() {
   const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
-  const r = mockReader(data)
+  const r = mockReader({ data })
   const reader = create(r, 2)
 
   const result = [
