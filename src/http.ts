@@ -2,9 +2,9 @@ import { listen as tcp } from 'deno'
 import { HttpRequest, read } from './http-request'
 import { HttpResponse, response } from './http-response'
 
-export type RequestHandler = (req: HttpRequest, res: HttpResponse) => void
+export type HttpHandler = (req: HttpRequest, res: HttpResponse) => void
 
-export async function listen(addr: string, handler: RequestHandler) {
+export async function listen(addr: string, handler: HttpHandler) {
   const listener = tcp('tcp', addr)
 
   while (true) {

@@ -40,8 +40,12 @@ Run unit tests with:
 deno test.ts
 ```
 
-Try the example with:
+Try the examples with:
 
 ```
 deno --allow-net examples/echo.ts
+```
+
+```
+deno --allow-net examples/serve-static.ts
 ```
