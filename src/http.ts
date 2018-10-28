@@ -1,3 +1,4 @@
+import { BufferedReader } from './buffered-reader'
 import { HttpRequest, read } from './http-request'
 import { HttpResponse, response } from './http-response'
 import { listen as tcp } from 'deno'
@@ -10,7 +11,7 @@ export async function listen(addr: string, handler: RequestHandler) {
 
   while (true) {
     const connection = await listener.accept()
-    read(connection).then(request => {
+    read(BufferedReader.from(connection, 4096)).then(request => {
       handler(request, response(connection))
     })
   }

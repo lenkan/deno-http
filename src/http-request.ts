@@ -1,4 +1,4 @@
-import { Reader, env } from 'deno'
+import { Reader } from './buffered-reader'
 import { createReader } from './http-body-reader'
 import { HttpRequestHeaders, parse as parseHeaders } from './http-header'
 
@@ -49,26 +49,20 @@ function parseEnvelope(data: Uint8Array): HttpRequestEnvelope {
 }
 
 export async function read(reader: Reader) : Promise<HttpRequest> {
+
   const bytes: number[] = []
 
   while (true) {
-    // A bit naive, reading one byte at a time. But it
-    // makes the implementation much easier, since we are sure to
-    // not "accidentally" read into the body part of the message.
-    // Could be changed to some sort of "buffered" reader to reduce
-    // overhead in communication with the backend.
-    const byte = new Uint8Array(1)
-    const readResult = await reader.read(byte)
+    const byte = await reader.readUint8()
 
-    // HTTP Spec says ignore intial line feeds
-    if (bytes.length === 0 && (byte[0] === CR || byte[0] === LF)) {
+    if (bytes.length === 0 && (byte === CR || byte === LF)) {
       continue
     }
 
-    bytes.push(byte[0])
+    bytes.push(byte)
     const end = bytes.slice(bytes.length - 4)
 
-    if (readResult.nread === 0 || readResult.eof || isEndOfEnvelope(end)) {
+    if (isEndOfEnvelope(end)) {
       const envelope = parseEnvelope(Uint8Array.from(bytes))
       const bodyReader = createReader(reader, envelope.headers)
 

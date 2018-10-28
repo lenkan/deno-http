@@ -1,9 +1,8 @@
-import { readDirSync, cwd } from "deno";
+import { readDirSync, args, exit } from 'deno'
 
 function traverse(dir: string) {
   return readDirSync(dir).reduce<string[]>((files, info) => {
-
-    if (info.isFile() && info.name.endsWith('.test.ts')) {
+    if (info.isFile() && info.name.endsWith('.test.ts') && info.name.includes(args[1] || '')) {
       return [...files, info.path]
     }
 

@@ -26,7 +26,7 @@ listen('127.0.0.1:3000', async (req, res) => {
 ```
 
 # Status
-Currently, some parts of the implementation is fairly naive and inefficient. Particularly [this](https://github.com/lenkan/deno-http/blob/master/src/http-request.ts#L54), but can be greatly improved. Parts of `Transfer-Encoding` is not implemented.
+Many specifics, for example `Transfer-Encoding` is not implemented.
 
 # Development
 

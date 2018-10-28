@@ -1,9 +1,10 @@
 import { assertEqual, assertDefined } from '../tools/assertions'
-import { mockReader } from '../tools/mocks'
 import { read } from './http-request'
+import { mockReader } from '../tools/mocks';
 
 const CRLF = '\r\n'
 const encoder = new TextEncoder()
+
 
 export async function testParseRequestLine() {
   const data = encoder.encode([
@@ -62,6 +63,7 @@ export async function testParseSimpleJSONBody() {
     `Content-Length: ${content.byteLength}`,
     CRLF,
   ].join(CRLF))
+
   const r = mockReader(Uint8Array.from([
     ...data.map(v => v),
     ...content.map(v => v)
