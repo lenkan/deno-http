@@ -43,5 +43,5 @@ deno test.ts
 Try the example with:
 
 ```
-deno --allow-net examples/index.ts
+deno --allow-net examples/echo.ts
 ```
