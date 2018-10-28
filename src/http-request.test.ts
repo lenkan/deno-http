@@ -49,7 +49,9 @@ export async function testParseHeaders() {
 
   const request = await read(r)
 
-  assertEqual(request.headers['Content-Type'], 'application/json')
+  assertEqual(request.headers, {
+    ['Content-Type']: 'application/json'
+  })
 }
 
 export async function testParseSimpleJSONBody() {
@@ -61,7 +63,7 @@ export async function testParseSimpleJSONBody() {
     CRLF,
   ].join(CRLF))
   const r = mockReader(Uint8Array.from([
-    ...data.map(v => v), 
+    ...data.map(v => v),
     ...content.map(v => v)
   ]))
 
@@ -69,5 +71,5 @@ export async function testParseSimpleJSONBody() {
   const actual = await request.json()
 
   assertDefined(actual)
-  assertEqual(actual.foo, 'bar')
+  assertEqual(actual, { foo: 'bar' })
 }

@@ -10,19 +10,15 @@ import { listen } from 'https://raw.githubusercontent.com/lenkan/deno-http/v0.0.
 listen('127.0.0.1:3000', async (req, res) => {
   const encoder = new TextEncoder('utf8')
 
-  const body = encoder.encode(JSON.stringify({
-    foo: 'bar'
+  const response = encoder.encode(JSON.stringify({
+    request: req
   }))
 
-
-  // Add HTTP response message properties, finish of with
-  // `reply` to send and close the connection
   await res
-    .status(200)
-    .reason('OK')
-    .header({
-      name: 'Content-Type',
-      value: 'application/json',
+    .status(200, 'OK')
+    .headers({
+      'Content-Type': 'application/json',
+      'Content-Length': response.byteLength.toString()
     })
     .body(body)
     .reply()
