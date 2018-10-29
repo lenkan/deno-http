@@ -1,18 +1,8 @@
-import { Conn } from 'deno'
 import { Reader, BufferedReader } from './buffered-reader'
 import { HttpRequestHeaders } from './http-header'
-
-const CRLF = '\r\n'
-const decoder = new TextDecoder('utf-8')
-const CR = 13
-const LF = 10
+import { Conn } from 'deno';
 
 export interface HttpRequest {
-  /**
-   * Gets the underlying connection instance, i.e. the connection object.
-   */
-  connection: Conn
-
   /**
    * The HTTP method used for the request.
    */
@@ -36,75 +26,35 @@ export interface HttpRequest {
   /**
    * Reads the entire body into a byte array and resolves with the result.
    */
-  buffer(): Promise<Uint8Array>
+  buffer(): Uint8Array
 
   /**
    * Reads and parses the entire body as a javascript object.
    */
-  json(): Promise<any>
+  json(): any
 
   /**
    * Reads and decodes the entire body as plain text.
    */
-  text(): Promise<string>
+  text(): string
 }
 
-function isEndOfEnvelope(slice: number[]) {
-  return slice[0] === CR &&
-    slice[1] === LF &&
-    slice[2] === CR &&
-    slice[3] === LF
-}
-
-function parseHeader(header: string) {
-  const separator = header.indexOf(':')
-  const name = header.slice(0, separator).trim()
-  const value = header.slice(separator + 1, header.length).trim()
-  return { name, value }
-}
-
-function parseHeaders(lines: string[]): HttpRequestHeaders {
-  return lines.reduce((all, line) => {
-    const { name, value } = parseHeader(line)
-    return {
-      ...all,
-      [name]: value
-    }
-  }, {})
-}
-
-function parseEnvelope(data: Uint8Array) {
-  const lines = decoder.decode(data).trim().split(CRLF)
-  if (lines.length === 0) {
-    throw new Error('Invalid request line')
-  }
-
-  const [method, path, protocol] = lines[0].split(' ').map(s => s.trim())
-  const headers = parseHeaders(lines.slice(1))
-
-  return {
-    method, 
-    path, 
-    protocol, 
-    headers
-  }
-}
-
-function readBody(reader: Reader, headers: HttpRequestHeaders) {
+async function readBody(reader: Reader, headers: HttpRequestHeaders) {
   const decoder = new TextDecoder('utf-8')
-  const hasBody = headers['Content-Length'] || headers['Transfer-Encoding']
+  const hasBody = headers['Content-Length']
   const length = parseInt(headers['Content-Length'] || '0', 10)
+  const body = hasBody ? await reader.read(length) : new Uint8Array(0)
 
-  function buffer(): Promise<Uint8Array> {
-    return hasBody ? reader.read(length) : Promise.resolve(new Uint8Array(0))
+  function buffer(): Uint8Array {
+    return body
   }
 
-  async function text() : Promise<string> {
-    return decoder.decode(await buffer())
+  function text(): string {
+    return decoder.decode(body)
   }
 
-  async function json() : Promise<any> {
-    return hasBody ? JSON.parse(await text()) : undefined
+  function json(): any {
+    return hasBody ? JSON.parse(text()) : undefined
   }
 
   return {
@@ -114,34 +64,49 @@ function readBody(reader: Reader, headers: HttpRequestHeaders) {
   }
 }
 
-export async function read(conn: Conn) : Promise<HttpRequest> {
-  const reader = BufferedReader.from(conn, 4096)
-  const bytes: number[] = []
+function parseHeader(line: string) {
+  const separator = line.indexOf(':')
+  const name = line.slice(0, separator).trim()
+  const value = line.slice(separator + 1, line.length).trim()
+  return { name, value }
+}
 
+function mergeHeaders(headers: HttpRequestHeaders, header: { name: string, value: string }) {
+  return { ...headers, [header.name]: header.value }
+}
+
+
+async function readLines(reader: Reader) {
+  const lines: string[] = []
   while (true) {
-    const byte = await reader.readUint8()
+    lines.push(await reader.readLine())
+    if (lines[lines.length - 1] === '') {
+      return lines.slice(0, lines.length - 1)
+    }
+  }
+}
 
-    if (bytes.length === 0 && (byte === CR || byte === LF)) {
+export async function* read(conn: Conn): AsyncIterableIterator<HttpRequest> {
+  const reader = BufferedReader.from(conn, 4096)
+  while (!reader.finished()) {
+    const request: string = await reader.readLine()
+    if (request === '') { // Try again until we get something or eof
       continue
     }
 
-    bytes.push(byte)
-    const end = bytes.slice(bytes.length - 4)
+    const lines = await readLines(reader)
+    const [method, path, protocol] = request.split(' ').map(s => s.trim())
+    const headers = lines.map(parseHeader).reduce(mergeHeaders, {})
+    const body = await readBody(reader, headers)
 
-    if (isEndOfEnvelope(end)) {
-      const envelope = parseEnvelope(Uint8Array.from(bytes))
-      const body = readBody(reader, envelope.headers)
-
-      return {
-        connection: conn,
-        path: envelope.path,
-        protocol: envelope.protocol,
-        method: envelope.method,
-        headers: envelope.headers,
-        buffer: body.buffer,
-        json: body.json,
-        text: body.text
-      }
+    yield {
+      path: path,
+      protocol: protocol,
+      method: method,
+      headers,
+      buffer: body.buffer,
+      json: body.json,
+      text: body.text
     }
   }
 }

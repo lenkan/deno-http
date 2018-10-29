@@ -60,7 +60,7 @@ function head(obj: HttpResponseHeaders) {
 }
 
 const defaultHeaders : HttpResponseHeaders = Object.freeze(head({
-  'Connection': 'close'
+  'Connection': 'keep-alive'
 }))
   
 

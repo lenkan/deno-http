@@ -18,7 +18,7 @@ export const mockConn = (args: { data?: Uint8Array }) => {
 
       return Promise.resolve<ReadResult>({
         nread,
-        eof: false
+        eof: current.byteLength === 0
       })
     },
 

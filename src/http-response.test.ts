@@ -56,7 +56,7 @@ export async function testReplyWithJSONBody() {
 
   assertEqual(text.length, 6)
   assertEqual(text[0], 'HTTP/1.1 200 OK')
-  assertEqual(text[1], 'Connection: close')
+  assertEqual(text[1], 'Connection: keep-alive')
   assertEqual(text[2], 'Content-Type: application/json')
   assertEqual(text[3], 'Content-Length: 13')
   assertEqual(text[4], '')

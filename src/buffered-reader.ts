@@ -1,69 +1,83 @@
-import { Reader as DenoReader } from 'deno'
+import { Reader as DenoReader, open } from 'deno'
 
 export interface Reader {
   reader: DenoReader
+  finished(): boolean
   read(length: number): Promise<Uint8Array>
-  readUint8(): Promise<number>
+  readLine(): Promise<string>
 }
 
-async function readChunk(reader: DenoReader, size: number): Promise<Uint8Array> {
-  const chunk = new Uint8Array(size)
-  const result = await reader.read(chunk)
-  return chunk.subarray(0, result.nread)
+function isLineFeed(a: Uint8Array) {
+  return a.byteLength === 2 && a[0] === 13 && a[1] === 10
 }
 
-function concat(chunks: Uint8Array[]) {
-  const totalSize = chunks.reduce((sum, c) => sum + c.length, 0)
-  const result = new Uint8Array(totalSize)
-
-  let position = 0
-  for (let i = 0; i < chunks.length; ++i) {
-    const chunk = chunks[i]
-    result.set(chunk, position)
-    position += chunk.length
-  }
-
-  return result
-}
+const decoder = new TextDecoder()
 
 export class BufferedReader implements Reader {
-  private chunk: Uint8Array
+  private data: Uint8Array = new Uint8Array(0)
   private pos: number = 0
+  private eof: boolean = false
 
-  constructor(public reader: DenoReader, private size : number) {}
+  constructor(public reader: DenoReader, private size: number) { }
 
-  async readUint8(): Promise<number> {
-    if (!this.chunk) {
-      this.chunk = await readChunk(this.reader, this.size)
-      this.pos = 0
+  private async take(size: number) {
+    if (this.eof) {
+      return false
     }
 
-    if (this.chunk.byteLength - this.pos < 1) {
-      this.chunk = await readChunk(this.reader, this.size)
-      this.pos = 0
+    const chunk = new Uint8Array(size)
+    const result = await this.reader.read(chunk)
+    this.eof = result.eof
+    const remaining = this.data.byteLength - this.pos
+    const newData = new Uint8Array(remaining + result.nread)
+    newData.set(this.data.subarray(this.pos), 0)
+    newData.set(chunk.subarray(0, result.nread), remaining)
+    this.data = newData
+    this.pos = 0
+    return result.nread > 0
+  }
+
+  private get current() {
+    return this.data.subarray(this.pos)
+  }
+
+  finished(): boolean {
+    return this.eof && this.current.byteLength === 0
+  }
+
+  async readLine(): Promise<string> {
+    while (!this.eof || this.current.byteLength > 0) {
+      const current = this.current
+      for (let i = 0; i < this.current.byteLength; ++i) {
+        if (isLineFeed(current.subarray(i, i + 2))) {
+          const result = current.subarray(0, i)
+          this.pos += i + 2
+          return decoder.decode(result)
+        }
+      }
+
+      if (!(await this.take(this.size))) {
+        break
+      }
     }
 
-    return this.chunk[this.pos++]
+    // No CRLF encountered, but stream has ended, so return what we've got
+    return decoder.decode(this.current)
   }
 
   async read(length: number): Promise<Uint8Array> {
-    if (!this.chunk) {
-      this.chunk = await readChunk(this.reader, this.size)
-      this.pos = 0
+    const current = this.current
+    if (current.byteLength < length) {
+      await this.take(Math.max(length - current.byteLength, this.size))
     }
 
-    while (this.chunk.byteLength - this.pos < length) {
-      const next = await readChunk(this.reader, this.size)
-      this.chunk = concat([this.chunk, next])
-    }
-
-    const result = this.chunk.subarray(this.pos, this.pos + length)
-    this.pos += length
-
+    const end = Math.min(this.current.byteLength, length)
+    const result = this.current.subarray(0, end)
+    this.pos += end
     return result
   }
 
-  static from(reader: DenoReader, size:number) {
+  static from(reader: DenoReader, size: number) {
     return new BufferedReader(reader, size)
   }
 }

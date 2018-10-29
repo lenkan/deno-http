@@ -5,45 +5,62 @@ import { BufferedReader } from './buffered-reader'
 const create = BufferedReader.from
 const encoder = new TextEncoder()
 
-export async function testReadBytes() {
+export async function testReadUntilLineFeed() {
+  const data = encoder.encode('foobar\r\n')
+  const r = mockReader({ data })
+  const reader = create(r, 1024)
+
+  const result = await reader.readLine()
+  assertEqual(result, 'foobar')
+}
+
+export async function testReadUntilLineFeedWithChunkedReader() {
+  const data = encoder.encode('foobar\r\n')
+  const r = mockReader({ data })
+  const reader = create(r, 2)
+
+  const result = await reader.readLine()
+  assertEqual(result, 'foobar')
+}
+
+export async function testReadLineUntilEnd() {
   const data = encoder.encode('foo')
   const r = mockReader({ data })
   const reader = create(r, 1024)
 
-  const result = [
-    await reader.readUint8(),
-    await reader.readUint8(),
-    await reader.readUint8()
-  ]
-
-  assertEqual(result[0], 102)
-  assertEqual(result[1], 111)
-  assertEqual(result[2], 111)
+  const result = await reader.readLine()
+  assertEqual(result, 'foo')
 }
 
-export async function testReadBytesWhenInputIsChunked() {
-  const data = encoder.encode('foobar')
+export async function testReadLines() {
+  const data = encoder.encode('foo\r\nbar\r\n')
   const r = mockReader({ data })
-  const reader = create(r, 2)
+  const reader = create(r, 1024)
 
-  const result = [
-    await reader.readUint8(),
-    await reader.readUint8(),
-    await reader.readUint8(),
-    await reader.readUint8(),
-    await reader.readUint8(),
-    await reader.readUint8(),
-  ]
-
-  assertEqual(result[0], 102)
-  assertEqual(result[1], 111)
-  assertEqual(result[2], 111)
-  assertEqual(result[3], 98)
-  assertEqual(result[4], 97)
-  assertEqual(result[5], 114)
+  assertEqual(await reader.readLine(), 'foo')
+  assertEqual(await reader.readLine(), 'bar')
 }
 
-export async function testReadLength() {
+export async function testReadLinesUntilEnd() {
+  const data = encoder.encode('foo\r\nbar')
+  const r = mockReader({ data })
+  const reader = create(r, 1024)
+
+  assertEqual(await reader.readLine(), 'foo')
+  assertEqual(await reader.readLine(), 'bar')
+}
+
+export async function testReadLinesUntilWithEmptyLineAtEnd() {
+  const data = encoder.encode('foo\r\nbar\r\n\r\n')
+  const r = mockReader({ data })
+  const reader = create(r, 1024)
+
+  assertEqual(await reader.readLine(), 'foo')
+  assertEqual(await reader.readLine(), 'bar')
+  assertEqual(await reader.readLine(), '')
+}
+
+export async function testRead() {
   const data = encoder.encode('foo')
   const r = mockReader({ data })
   const reader = create(r, 1024)
@@ -52,7 +69,18 @@ export async function testReadLength() {
   assertEqual(result, Uint8Array.from([102, 111, 111]))
 }
 
-export async function testReadLengthWhenDataIsChunked() {
+export async function testReadAfterReadLines() {
+  const data = encoder.encode('foo\r\nbar\r\n\r\nbody')
+  const r = mockReader({ data })
+  const reader = create(r, 1024)
+
+  assertEqual(await reader.readLine(), 'foo')
+  assertEqual(await reader.readLine(), 'bar')
+  assertEqual(await reader.readLine(), '')
+  assertEqual(await reader.read(4), [98, 111, 100, 121])
+}
+
+export async function testReadWhenDataIsChunked() {
   const data = encoder.encode('foobar')
   const r = mockReader({ data })
   const reader = create(r, 3)
@@ -61,7 +89,7 @@ export async function testReadLengthWhenDataIsChunked() {
   assertEqual(result, Uint8Array.from([102, 111, 111, 98, 97, 114]))
 }
 
-export async function testReadLengthMultipleTimes() {
+export async function testReadMultipleTimes() {
   const data = encoder.encode('foobar')
   const r = mockReader({ data })
   const reader = create(r, 1024)
@@ -73,9 +101,10 @@ export async function testReadLengthMultipleTimes() {
 
   assertEqual(result[0], Uint8Array.from([102, 111, 111]))
   assertEqual(result[1], Uint8Array.from([98, 97, 114]))
+  assertEqual(reader.finished(), true)
 }
 
-export async function testReadLengthMultipleTimesWhenDataIsChunked() {
+export async function testReadMultipleTimesWhenDataIsChunked() {
   const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
   const r = mockReader({ data })
@@ -88,4 +117,5 @@ export async function testReadLengthMultipleTimesWhenDataIsChunked() {
 
   assertEqual(result[0], Uint8Array.from([102, 111, 111]))
   assertEqual(result[1], Uint8Array.from([98, 97, 114]))
+  assertEqual(reader.finished(), true)
 }

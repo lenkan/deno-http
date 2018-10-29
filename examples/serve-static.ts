@@ -41,6 +41,7 @@ function serveStatic(path: string): HttpHandler {
 
     return res.status(200, 'OK')
       .headers({
+        'Connection': 'keep-alive',
         'Content-Length': content.byteLength.toString(),
         'Content-Type': type
       }).send(content)

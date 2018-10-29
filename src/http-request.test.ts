@@ -40,11 +40,11 @@ export async function testParseRequestLine() {
 
   const conn = mockConn({ data })
 
-  const request = await read(conn)
+  const request = await read(conn).next()
 
-  assertEqual(request.method, 'GET')
-  assertEqual(request.path, '/foo/bar')
-  assertEqual(request.protocol, 'HTTP/1.1')
+  assertEqual(request.value.method, 'GET')
+  assertEqual(request.value.path, '/foo/bar')
+  assertEqual(request.value.protocol, 'HTTP/1.1')
 }
 
 export async function testParseRequestLineWithPreceedingLineFeeds() {
@@ -58,11 +58,11 @@ export async function testParseRequestLineWithPreceedingLineFeeds() {
 
   const connection = mockConn({ data })
 
-  const request = await read(connection)
+  const request = await read(connection).next()
 
-  assertEqual(request.method, 'GET')
-  assertEqual(request.path, '/foo/bar')
-  assertEqual(request.protocol, 'HTTP/1.1')
+  assertEqual(request.value.method, 'GET')
+  assertEqual(request.value.path, '/foo/bar')
+  assertEqual(request.value.protocol, 'HTTP/1.1')
 }
 
 export async function testParseHeaders() {
@@ -73,9 +73,9 @@ export async function testParseHeaders() {
   ])
   const conn = mockConn({ data })
 
-  const request = await read(conn)
+  const request = await read(conn).next()
 
-  assertEqual(request.headers, {
+  assertEqual(request.value.headers, {
     ['Content-Type']: 'application/json'
   })
 }
@@ -83,8 +83,8 @@ export async function testParseHeaders() {
 export async function testParseSimpleJSONBody() {
   const data = encodeJson({ foo: 'bar' })
 
-  const request = await read(mockConn({ data }))
-  const actual = await request.json()
+  const request = await read(mockConn({ data })).next()
+  const actual = request.value.json()
 
   assertDefined(actual)
   assertEqual(actual, { foo: 'bar' })
@@ -98,16 +98,16 @@ export async function testReadJSONWhenThereIsNoContentLength() {
     JSON.stringify({ foo: 'bar' })
   ])
 
-  const request = await read(mockConn({ data }))
-  const result = await request.json()
+  const request = await read(mockConn({ data })).next()
+  const result = request.value.json()
   assertEqual(result, undefined)
 }
 
 export async function testReadTextWhenContentLengthIsSpecified() {
   const data = encodeText('hallo')
 
-  const request = await read(mockConn({ data }))
+  const request = await read(mockConn({ data })).next()
 
-  const result = await request.text()
+  const result = request.value.text()
   assertEqual(result, 'hallo')
 }
