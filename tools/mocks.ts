@@ -46,6 +46,9 @@ export const mockConn = (args: { data?: Uint8Array }) => {
     },
     isOpen() {
       return open
+    },
+    wasClosed() {
+      return open === false
     }
   })
 }

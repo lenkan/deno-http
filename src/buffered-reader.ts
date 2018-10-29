@@ -1,7 +1,6 @@
-import { Reader as DenoReader, open } from 'deno'
+import { Reader as DenoReader, Closer as DenoCloser } from 'deno'
 
 export interface Reader {
-  reader: DenoReader
   finished(): boolean
   read(length: number): Promise<Uint8Array>
   readLine(): Promise<string>
@@ -18,7 +17,7 @@ export class BufferedReader implements Reader {
   private pos: number = 0
   private eof: boolean = false
 
-  constructor(public reader: DenoReader, private size: number) { }
+  constructor(public reader: DenoReader & DenoCloser, private size: number) { }
 
   private async take(size: number) {
     if (this.eof) {
@@ -27,7 +26,10 @@ export class BufferedReader implements Reader {
 
     const chunk = new Uint8Array(size)
     const result = await this.reader.read(chunk)
-    this.eof = result.eof
+    if (result.eof) {
+      this.eof = result.eof
+      this.reader.close()
+    }
     const remaining = this.data.byteLength - this.pos
     const newData = new Uint8Array(remaining + result.nread)
     newData.set(this.data.subarray(this.pos), 0)
@@ -43,6 +45,12 @@ export class BufferedReader implements Reader {
 
   finished(): boolean {
     return this.eof && this.current.byteLength === 0
+  }
+
+  close() {
+    if (!this.eof) {
+      this.reader.close()
+    }
   }
 
   async readLine(): Promise<string> {
@@ -77,7 +85,7 @@ export class BufferedReader implements Reader {
     return result
   }
 
-  static from(reader: DenoReader, size: number) {
+  static from(reader: DenoReader & DenoCloser, size: number) {
     return new BufferedReader(reader, size)
   }
 }

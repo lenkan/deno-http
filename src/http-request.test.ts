@@ -111,3 +111,37 @@ export async function testReadTextWhenContentLengthIsSpecified() {
   const result = request.value.text()
   assertEqual(result, 'hallo')
 }
+
+export async function testReadMultipleRequests() {
+  const data1 = encodeText('hallo1')
+  const data2 = encodeText('hallo2')
+
+  const conn = mockConn({ data: Uint8Array.from([...data1.map(v => v), ...data2.map(v => v)]) })
+  const stream = read(conn)
+
+  const { value: r1 } = await stream.next()
+  const { value: r2 } = await stream.next()
+  assertEqual(r1.text(), 'hallo1')
+  assertEqual(r2.text(), 'hallo2')
+}
+
+export async function testCloseWhenConnectionHeaderSaysClose_EvenIfNotEOF() {
+  const data2 = new Uint8Array(4096) // A bit arbitrary, its the chunk size atm
+
+  const data = encodeLines([
+    'GET /foo/bar HTTP/1.1',
+    'Connection: close',
+    CRLF,
+    'GET /foo/bar2 HTTP/1.1',
+    'Connection: close',
+    `Content-Length: ${data2.byteLength}`,
+    CRLF,
+    encoder.encode(data2)
+  ])
+
+  const conn = mockConn({ data })
+
+  const stream = read(conn)
+  await stream.next()
+  assertEqual(conn.wasClosed(), true)
+}

@@ -96,8 +96,12 @@ export async function* read(conn: Conn): AsyncIterableIterator<HttpRequest> {
 
     const lines = await readLines(reader)
     const [method, path, protocol] = request.split(' ').map(s => s.trim())
-    const headers = lines.map(parseHeader).reduce(mergeHeaders, {})
+    const headers = lines.map(parseHeader).reduce<HttpRequestHeaders>(mergeHeaders, {})
     const body = await readBody(reader, headers)
+
+    if (headers['Connection'] === 'close') {
+      reader.close()
+    }
 
     yield {
       path: path,

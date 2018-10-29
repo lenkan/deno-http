@@ -1,4 +1,4 @@
-import { mockConn as mockReader } from '../tools/mocks'
+import { mockConn as mockResource } from '../tools/mocks'
 import { assertEqual } from '../tools/assertions'
 import { BufferedReader } from './buffered-reader'
 
@@ -7,7 +7,7 @@ const encoder = new TextEncoder()
 
 export async function testReadUntilLineFeed() {
   const data = encoder.encode('foobar\r\n')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   const result = await reader.readLine()
@@ -16,7 +16,7 @@ export async function testReadUntilLineFeed() {
 
 export async function testReadUntilLineFeedWithChunkedReader() {
   const data = encoder.encode('foobar\r\n')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 2)
 
   const result = await reader.readLine()
@@ -25,7 +25,7 @@ export async function testReadUntilLineFeedWithChunkedReader() {
 
 export async function testReadLineUntilEnd() {
   const data = encoder.encode('foo')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   const result = await reader.readLine()
@@ -34,7 +34,7 @@ export async function testReadLineUntilEnd() {
 
 export async function testReadLines() {
   const data = encoder.encode('foo\r\nbar\r\n')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   assertEqual(await reader.readLine(), 'foo')
@@ -43,7 +43,7 @@ export async function testReadLines() {
 
 export async function testReadLinesUntilEnd() {
   const data = encoder.encode('foo\r\nbar')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   assertEqual(await reader.readLine(), 'foo')
@@ -52,7 +52,7 @@ export async function testReadLinesUntilEnd() {
 
 export async function testReadLinesUntilWithEmptyLineAtEnd() {
   const data = encoder.encode('foo\r\nbar\r\n\r\n')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   assertEqual(await reader.readLine(), 'foo')
@@ -62,7 +62,7 @@ export async function testReadLinesUntilWithEmptyLineAtEnd() {
 
 export async function testRead() {
   const data = encoder.encode('foo')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   const result = await reader.read(3)
@@ -71,7 +71,7 @@ export async function testRead() {
 
 export async function testReadAfterReadLines() {
   const data = encoder.encode('foo\r\nbar\r\n\r\nbody')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   assertEqual(await reader.readLine(), 'foo')
@@ -82,7 +82,7 @@ export async function testReadAfterReadLines() {
 
 export async function testReadWhenDataIsChunked() {
   const data = encoder.encode('foobar')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 3)
 
   const result = await reader.read(6)
@@ -91,7 +91,7 @@ export async function testReadWhenDataIsChunked() {
 
 export async function testReadMultipleTimes() {
   const data = encoder.encode('foobar')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 1024)
 
   const result = [
@@ -107,7 +107,7 @@ export async function testReadMultipleTimes() {
 export async function testReadMultipleTimesWhenDataIsChunked() {
   const encoder = new TextEncoder()
   const data = encoder.encode('foobar')
-  const r = mockReader({ data })
+  const r = mockResource({ data })
   const reader = create(r, 2)
 
   const result = [
@@ -118,4 +118,51 @@ export async function testReadMultipleTimesWhenDataIsChunked() {
   assertEqual(result[0], Uint8Array.from([102, 111, 111]))
   assertEqual(result[1], Uint8Array.from([98, 97, 114]))
   assertEqual(reader.finished(), true)
+}
+
+export async function testCloseReaderOnEOF() {
+  const encoder = new TextEncoder()
+  const data = encoder.encode('foobar')
+  const r = mockResource({ data })
+  const reader = create(r, 1024)
+
+  await reader.read(6)
+
+  assertEqual(r.wasClosed(), true)
+}
+
+export async function testCloseReaderOnEOF_MultipleChunks() {
+  const encoder = new TextEncoder()
+  const data = encoder.encode('foobar')
+  const r = mockResource({ data })
+  const reader = create(r, 3)
+
+  await reader.read(6)
+
+  assertEqual(r.wasClosed(), true)
+}
+
+export async function testCloseReaderOnEOF_MultipleReads() {
+  const encoder = new TextEncoder()
+  const data = encoder.encode('foobar')
+  const r = mockResource({ data })
+  const reader = create(r, 3)
+
+  await reader.read(3)
+  assertEqual(r.wasClosed(), false)
+  await reader.read(3)
+  assertEqual(r.wasClosed(), true)
+}
+
+export async function testCloseReaderOnEOF_MultipleReadsOneChunk() {
+  const encoder = new TextEncoder()
+  const data = encoder.encode('foobar')
+  const r = mockResource({ data })
+  const reader = create(r, 1024)
+
+  await reader.read(3)
+  // Closes here becuase the big chunk has already been read
+  assertEqual(r.wasClosed(), true) 
+  await reader.read(3)
+  assertEqual(r.wasClosed(), true)
 }
