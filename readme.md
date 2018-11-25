@@ -10,7 +10,7 @@ import { listen } from 'https://raw.githubusercontent.com/lenkan/deno-http/v0.0.
 listen('127.0.0.1:3000', async (req, res) => {
   const encoder = new TextEncoder('utf8')
 
-  const response = encoder.encode(JSON.stringify({
+  const body = encoder.encode(JSON.stringify({
     request: req
   }))
 
